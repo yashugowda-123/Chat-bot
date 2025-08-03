@@ -1,34 +1,72 @@
 import streamlit as st
-import openai
-import PyPDF2
-import io
+import google.generativeai as genai
+from google.generativeai import GenerativeModel
 
-# Set your OpenAI API key
-openai.api_key = st.secrets["QqNjj2btQCoX2Or1pK0s9Pr7QE9f5S1c7RXCLmfPhJx8KjDnEA49CK29q55373XsLUsT6FOdyfT3BlbkFJJZf_Yy6K2r1RQi2CZLwVjPO1VAPFIjiiieqjS9KrNvivKCnPqSgzD-W8_6HvlKB5oamEH-CDUA"]  # or use st.text_input + st.session_state
+# --- 🎯 Core Features (Foundational) ---
 
-st.title("📄 Ask AI Anything About Your PDF")
+## 4️⃣ Clean Streamlit UI
+st.set_page_config(page_title="PYQ AI Assistant 📝", page_icon="🧠", layout="centered")
 
-# Upload PDF
-pdf_file = st.file_uploader("Upload a PDF file", type=["pdf"])
+st.title("PYQ AI Assistant 📝")
+st.markdown("Easily generate similar questions and answer keys from any Previous Year Question (PYQ).")
 
-if pdf_file:
-    pdf_reader = PyPDF2.PdfReader(pdf_file)
-    text = ""
-    for page in pdf_reader.pages:
-        text += page.extract_text()
 
-    st.text_area("Extracted Text", text[:2000], height=200)  # show preview
+# --- Configure Google Gemini API ---
+# Use st.secrets to access the API key securely from .streamlit/secrets.toml
+try:
+    genai.configure(api_key=st.secrets["AIzaSyAX7TGpaaiszs1Z3Rn1Dp4vXpFOPnk0MfU"])
+except KeyError:
+    st.error("API Key not found. Please add your 'GEMINI_API_KEY' to .streamlit/secrets.toml.")
+    st.stop()
 
-    question = st.text_input("Ask a question about the PDF")
-    if st.button("Ask"):
-        if question.strip():
-            with st.spinner("Thinking..."):
-                response = openai.ChatCompletion.create(
-                    model="gpt-3.5-turbo",
-                    messages=[
-                        {"role": "system", "content": "You are a helpful assistant."},
-                        {"role": "user", "content": f"Here's a document: {text[:3000]} \n\nAnswer this: {question}"},
-                    ],
-                    temperature=0.2,
-                )
-                st.success(response.choices[0].message["content"])
+# Initialize the Gemini model. We'll use a single model for both tasks.
+model = GenerativeModel(model_name="gemini-1.5-pro-latest")
+
+# Function to generate a similar question
+def generate_similar_question(original_question):
+    prompt = f"Paraphrase the following previous year's question into a similar but distinct question: {original_question}"
+    try:
+        response = model.generate_content(prompt)
+        return response.text
+    except Exception as e:
+        st.error(f"Error generating similar question: {e}")
+        return None
+
+# Function to generate an answer key
+def generate_answer_key(question):
+    prompt = f"Provide a concise sample answer key or marking scheme for the following question: {question}"
+    try:
+        response = model.generate_content(prompt)
+        return response.text
+    except Exception as e:
+        st.error(f"Error generating answer key: {e}")
+        return None
+
+
+# 1️⃣ PYQ Input
+user_pyq = st.text_area(
+    "Enter a Previous Year Question (PYQ) here 👇",
+    "What is the difference between a list and a tuple in Python?",
+    height=150,
+    help="Type in a question from a previous year's exam paper."
+)
+
+if st.button("Generate Similar Question and Answer Key 🚀"):
+    if user_pyq:
+        with st.spinner("Generating..."):
+            # 2️⃣ Similar Question Generator
+            generated_question = generate_similar_question(user_pyq)
+            
+            # 3️⃣ Answer Key Generator
+            generated_answer = generate_answer_key(user_pyq)
+
+        # --- Display results ---
+        if generated_question:
+            st.subheader("Generated Similar Question 🧠")
+            st.info(generated_question)
+        
+        if generated_answer:
+            st.subheader("Sample Answer Key 🔑")
+            st.success(generated_answer)
+    else:
+        st.warning("Please enter a question to generate results.")
