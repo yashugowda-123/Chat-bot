@@ -1,40 +1,34 @@
 import streamlit as st
 import openai
-from google.cloud import translate_v2 as translate
-import os
+import PyPDF2
+import io
 
-# 🔐 Define API keys directly in this file
-OPENAI_API_KEY = "QqNjj2btQCoX2Or1pK0s9Pr7QE9f5S1c7RXCLmfPhJx8KjDnEA49CK29q55373XsLUsT6FOdyfT3BlbkFJJZf_Yy6K2r1RQi2CZLwVjPO1VAPFIjiiieqjS9KrNvivKCnPqSgzD-W8_6HvlKB5oamEH-CDUA"
-GOOGLE_API_KEY = "AIzaSyAX7TGpaaiszs1Z3Rn1Dp4vXpFOPnk0MfU"  # Only needed if you're using unofficial API or setting env manually
+# Set your OpenAI API key
+openai.api_key = st.secrets["QqNjj2btQCoX2Or1pK0s9Pr7QE9f5S1c7RXCLmfPhJx8KjDnEA49CK29q55373XsLUsT6FOdyfT3BlbkFJJZf_Yy6K2r1RQi2CZLwVjPO1VAPFIjiiieqjS9KrNvivKCnPqSgzD-W8_6HvlKB5oamEH-CDUA"]  # or use st.text_input + st.session_state
 
-# ✅ Set OpenAI API key
-openai.api_key = OPENAI_API_KEY
+st.title("📄 Ask AI Anything About Your PDF")
 
-# Optional: Set Google Application Credentials if using official Google Cloud API
-# os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = "path_to_your_google_credentials.json"
+# Upload PDF
+pdf_file = st.file_uploader("Upload a PDF file", type=["pdf"])
 
-st.set_page_config(page_title="PYQ AI Assistant", page_icon="📘")
+if pdf_file:
+    pdf_reader = PyPDF2.PdfReader(pdf_file)
+    text = ""
+    for page in pdf_reader.pages:
+        text += page.extract_text()
 
-st.title("📘 PYQ Similar Question Generator")
+    st.text_area("Extracted Text", text[:2000], height=200)  # show preview
 
-user_question = st.text_input("Enter your PYQ question:")
-
-if user_question:
-    with st.spinner("Generating similar question..."):
-        response = openai.ChatCompletion.create(
-            model="gpt-3.5-turbo",
-            messages=[
-                {"role": "user", "content": f"Generate a similar question for: {user_question}"}
-            ]
-        )
-        sim_q = response['choices'][0]['message']['content']
-        st.success("✅ Similar Question:")
-        st.markdown(sim_q)
-
-    # 🌐 Translate to Hindi using Google Translate API
-    try:
-        client = translate.Client()
-        translated = client.translate(sim_q, target_language='hi')
-        st.info(f"🌐 Hindi Translation: {translated['translatedText']}")
-    except Exception as e:
-        st.error("Translation failed. Make sure your Google credentials are set up.")
+    question = st.text_input("Ask a question about the PDF")
+    if st.button("Ask"):
+        if question.strip():
+            with st.spinner("Thinking..."):
+                response = openai.ChatCompletion.create(
+                    model="gpt-3.5-turbo",
+                    messages=[
+                        {"role": "system", "content": "You are a helpful assistant."},
+                        {"role": "user", "content": f"Here's a document: {text[:3000]} \n\nAnswer this: {question}"},
+                    ],
+                    temperature=0.2,
+                )
+                st.success(response.choices[0].message["content"])
